@@ -46,15 +46,14 @@ jobs:
 
       - name: Build binary
         run: |
-          cargo build --target ${{ matrix.target }}
           cargo build --release --target ${{ matrix.target }} 
+          cargo build --example req_auth --release --target ${{ matrix.target }} 
         env:
           RUST_BACKTRACE: 1
 
       - name: Strip binary (linux and macos)
         if: matrix.build == 'linux' || matrix.build == 'macos'
         run: |
-          strip "target/${{ matrix.target }}/debug/hit_course"
           strip "target/${{ matrix.target }}/release/hit_course"
 
       - name: Build archive
@@ -63,13 +62,13 @@ jobs:
           mkdir archive
           cd archive
           if [ "${{ matrix.build }}" = "windows" ]; then
-            cp "../target/${{ matrix.target }}/debug/hit_course.exe" ./
-            cp "../target/${{ matrix.target }}/release/hit_course.exe" ./hit_course_release.exe
-            7z a "${{ matrix.archive-name }}" hit_course.exe hit_course_release.exe
+            cp "../target/${{ matrix.target }}/release/hit_course.exe" ./hit_course.exe
+            cp "../target/${{ matrix.target }}/release/examples/req_auth.exe" ./req_auth.exe
+            7z a "${{ matrix.archive-name }}" hit_course.exe req_auth.exe
           else
-            cp "../target/${{ matrix.target }}/debug/hit_course" ./
-            cp "../target/${{ matrix.target }}/release/hit_course" ./hit_course_release
-            tar -czf "${{ matrix.archive-name }}" hit_course hit_course_release
+            cp "../target/${{ matrix.target }}/release/hit_course" ./hit_course
+            cp "../target/${{ matrix.target }}/release/examples/req_auth" ./req_auth
+            tar -czf "${{ matrix.archive-name }}" hit_course req_auth
           fi
       - name: Upload archive
         uses: actions/upload-artifact@v4
