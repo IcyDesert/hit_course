@@ -1,8 +1,17 @@
+use clap::Parser;
 use colored::*;
 use reqwest::Client;
 use serde_json::Value;
 use std::error::Error;
 use std::fs::File;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// cookie
+    #[arg(short, long)]
+    cookie: String,
+}
 
 async fn curl_request(cookie: &str, id: &str) -> Result<String, Box<dyn Error>> {
     let client = Client::new();
@@ -50,26 +59,28 @@ fn curl_request_str(cookie: &str, id: ColoredString) -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let file = File::open("../must.json").expect("unable to open file.");
+    let args = Args::parse();
+
+    let file = File::open("./must.json").expect("unable to open file.");
     let must_choose: Value = serde_json::from_reader(file)?;
-    let cookie  = "_gscu_651000777=24674045iuwr7920; JSESSIONID=966F34B632E5130BDB327C71A6D18F8B; route=1db2c5f6085b9278d9cf7aaa8af65cd2";
+    let cookie = args.cookie;
 
     let _res = choose_course(
         must_choose["kxrwList"]["list"]
             .as_array()
             .unwrap_or(&vec![]),
-        cookie,
+        &cookie,
     )
     .await?;
 
-    let file = File::open("../pe.json").expect("unable to open file.");
+    let file = File::open("./pe.json").expect("unable to open file.");
     let must_choose: Value = serde_json::from_reader(file)?;
 
     let _res = choose_course(
         must_choose["kxrwList"]["list"]
             .as_array()
             .unwrap_or(&vec![]),
-        cookie,
+        &cookie,
     )
     .await?;
 
