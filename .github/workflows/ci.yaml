@@ -1,0 +1,110 @@
+on: [push, pull_request]
+name: build
+
+jobs:
+  build:
+    name: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [linux, macos, windows]
+        include:
+          - build: linux
+            os: ubuntu-latest
+            rust: nightly
+            target: x86_64-unknown-linux-musl
+            archive-name: hit_course-linux.tar.gz
+          - build: macos
+            os: macos-latest
+            rust: nightly
+            target: x86_64-apple-darwin
+            archive-name: hit_course-macos.tar.gz
+          - build: windows
+            os: windows-2019
+            rust: nightly-x86_64-msvc
+            target: x86_64-pc-windows-msvc
+            archive-name: hit_course-windows.7z
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust }}
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
+      
+      - name: install openssl-tools
+        if: matrix.build == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install libssl-dev cmake pkg-config musl-tools
+
+      - name: Build binary
+        run: |
+          cargo build --target ${{ matrix.target }}
+          cargo build --release --target ${{ matrix.target }} 
+        env:
+          RUST_BACKTRACE: 1
+
+      - name: Strip binary (linux and macos)
+        if: matrix.build == 'linux' || matrix.build == 'macos'
+        run: |
+          strip "target/${{ matrix.target }}/debug/hit_course"
+          strip "target/${{ matrix.target }}/release/hit_course"
+
+      - name: Build archive
+        shell: bash
+        run: |
+          mkdir archive
+          cd archive
+          if [ "${{ matrix.build }}" = "windows" ]; then
+            cp "../target/${{ matrix.target }}/debug/hit_course.exe" ./
+            cp "../target/${{ matrix.target }}/release/hit_course.exe" ./hit_course_release.exe
+            7z a "${{ matrix.archive-name }}" hit_course.exe hit_course_release.exe
+          else
+            cp "../target/${{ matrix.target }}/debug/hit_course" ./
+            cp "../target/${{ matrix.target }}/release/hit_course" ./hit_course_release
+            tar -czf "${{ matrix.archive-name }}" hit_course hit_course_release
+          fi
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive-name }}
+          path: archive/${{ matrix.archive-name }}
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: ${{ startsWith(github.ref, 'refs/heads/main') }}
+    needs: [build]
+    permissions:
+      # Use to sign the release artifacts
+      id-token: write
+      # Used to upload release artifacts
+      contents: write
+      # Used to generate artifact attestation
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+      - name: Display structure of downloaded files
+        run: ls -R
+      - name: pwd
+        run: pwd
+      # - name: Generate artifact attestation
+      #   uses: actions/attest-build-provenance@v1
+      #   with:
+      #     subject-path: 'wheels-*/*'
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            hit_course-linux.tar.gz
+            hit_course-macos.tar.gz
+            hit_course-windows.7z
+          draft: true
+          fail_on_unmatched_files: true
