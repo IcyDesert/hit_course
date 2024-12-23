@@ -103,8 +103,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            hit_course-linux.tar.gz
-            hit_course-macos.tar.gz
-            hit_course-windows.7z
+            hit_course-linux.tar.gz/hit_course-linux.tar.gz
+            hit_course-macos.tar.gz/hit_course-macos.tar.gz
+            hit_course-windows.7z/hit_course-windows.7z
           draft: true
           fail_on_unmatched_files: true
