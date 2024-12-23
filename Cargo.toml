@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.5.23" , features = ["derive"] }
 colored = "2.2.0"
-openssl = "0.10.68"
+openssl = { version = "0.10", features = ["vendored"] }
 reqwest = { version = "0.12.9", features = ["json", "cookies"] }
 scraper = "0.22.0"
 serde = { version = "1.0.216", features = ["derive"] }
