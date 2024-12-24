@@ -167,7 +167,7 @@ async fn choose_course(all_course: &Vec<Value>, client: Client) -> Result<(), Bo
             "\n\nCourse id: {}, Course name: {}, Course teacher: {} {}",
             course["id"].as_str().unwrap().green().bold(),
             course["kcmc"].as_str().unwrap().purple().bold(),
-            course["dgjsmc"].as_str().unwrap().blue().bold(),
+            course["dgjsmc"].as_str().unwrap_or("").blue().bold(),
             course["tyxmmc"].as_str().unwrap_or("").blue().bold(),
         );
 
