@@ -14,18 +14,15 @@ hit_course
 ---
 这两个分别是提前准备好课程信息和cookie，直接对应请求，而第二个是直接从头开始走一遍验证。
 
-使用 hit_course 需要提前准备两个文件
+使用 hit_course 需要提前准备课程的文件，放在 all_courses下面
 ```
-must.json
-pe.json
+all_courses/<your courses>.json
 ``` 
 可以直接在浏览器中打开 f12 ，选中网络，然后点击必修课程，能够看到一条请求。将这条请求复制位 cURL
 ![browser](static/QQ_1734983191878.png)
 然后将命令粘贴到命令行，追加 ` > must.json`，例如
 ![](static/QQ_1734983307628.png)
-就可以写入一个json文件了。`pe.json` 也是一样的，将别的课程（例如跨专业/体育课）的课程使用同样的方法将 json 导入 `pe.json` ，那么就可以以相同的方法选课。
-
-接下来复制你的cookie，然后使用
+就可以写入一个json文件了。将这个json文件放到 all_courses 下面。接下来复制你的cookie（可以从上面复制的命令里面找到），然后使用
 ```
 ./hit_course --cookie <your cookie>
 ```

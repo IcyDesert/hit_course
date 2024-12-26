@@ -6,8 +6,8 @@ use scraper::{Html, Selector};
 use serde_json::{from_str, Value};
 use std::collections::HashMap;
 use std::error::Error;
-use std::io::BufRead;
-use std::{fs, io};
+use std::fs::{self, File};
+use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -23,14 +23,6 @@ struct Args {
     /// 是否从外部 JSON 读取课程信息
     #[arg(short, long, default_value_t = false)]
     json: bool,
-
-    /// 包含课程信息文件地址的文件路径
-    #[arg(short, long)]
-    file_paths: Option<String>,
-
-    /// 自提供 cookie
-    #[arg(short, long)]
-    cookie: Option<String>,
 }
 
 #[tokio::main]
@@ -38,24 +30,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // parse params
     let args = Args::parse();
 
-    if args.json {
-        if let Some(course_file_path) = args.file_paths {
-            let all_course_file_path: Vec<&str> = course_file_path.split(" ").collect();
-            let mut all_course_info = Vec::new();
-            for course_file_path in all_course_file_path {
-                let file = fs::File::open(&course_file_path)?;
-                let reader = io::BufReader::new(file);
+    let courses_dir = Path::new("./all_courses");
 
-                for line in reader.lines() {
-                    let file_path = line?;
-                    let content = fs::read_to_string(&file_path)?;
-                    let course_info: Value = serde_json::from_str(&content)?;
-                    all_course_info.push(course_info);
-                }
-            }
-        } else {
-            println!("--course-file 参数未提供");
-        }
+    if !courses_dir.is_dir() {
+        eprintln!("The directory {} does not exist.", courses_dir.display());
     }
 
     // new client, with cookie store
@@ -97,6 +75,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     println!("{}", "Login success.".green().bold());
     // auth end.
+
+    if args.json {
+        for entry in fs::read_dir(courses_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+                let file = File::open(&path).expect("unable to open file.");
+                let to_choose: Value = serde_json::from_reader(file)?;
+
+                list_all_course(to_choose["kxrwList"]["list"].as_array().unwrap_or(&vec![]));
+            }
+        }
+
+        for entry in fs::read_dir(courses_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+
+            if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+                let file = File::open(&path).expect("unable to open file.");
+                let to_choose: Value = serde_json::from_reader(file)?;
+
+                let _res = choose_course(
+                    to_choose["kxrwList"]["list"].as_array().unwrap_or(&vec![]),
+                    client.clone(),
+                )
+                .await?;
+            }
+        }
+
+        return Ok(());
+    }
+
     // get courses.
     let mut body = init_req_body();
 
@@ -121,7 +132,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .post("http://jw.hitsz.edu.cn/Xsxk/queryKxrw")
         .header("Connection", "keep-alive")
         .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-        .body("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=2024-2025&p_xq=2&p_xnxq=2024-20252&p_dqxn=2024-2025&p_dqxq=1&p_dqxnxq=2024-20251&p_xkfsdm=bx-b-b&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id=&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=16")
+        .body("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=2024-2025&p_xq=2&p_xnxq=2024-20252&p_dqxn=2024-2025&p_dqxq=1&p_dqxnxq=2024-20251&p_xkfsdm=bx-b-b&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id=&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=100")
         .send()
         .await?
         .text()
@@ -141,7 +152,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             "application/x-www-form-urlencoded; charset=UTF-8",
         )
         // .form(&body)
-        .body("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=2024-2025&p_xq=2&p_xnxq=2024-20252&p_dqxn=2024-2025&p_dqxq=1&p_dqxnxq=2024-20251&p_xkfsdm=ty-b-b&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id=&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=17")
+        .body("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=2024-2025&p_xq=2&p_xnxq=2024-20252&p_dqxn=2024-2025&p_dqxq=1&p_dqxnxq=2024-20251&p_xkfsdm=ty-b-b&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id=&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=100")
         .send()
         .await?
         .text()
@@ -185,8 +196,8 @@ async fn choose_course(all_course: &Vec<Value>, client: Client) -> Result<(), Bo
             // );
 
             let res = curl_request(client.clone(), course["id"].as_str().unwrap()).await;
-            let _  = match res {
-                Ok(res) => println!("{} {}", "Success:".green().bold(),res),
+            let _ = match res {
+                Ok(res) => println!("{} {}", "Success:".green().bold(), res),
                 Err(e) => println!("{}", e.to_string().red().bold()),
             };
         } else {
@@ -217,7 +228,7 @@ async fn curl_request(client: Client, id: &str) -> Result<String, Box<dyn Error>
             "Content-Type",
             "application/x-www-form-urlencoded; charset=UTF-8",
         )
-        .body(format!("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=rwtjzyx&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=2024-2025&p_xq=2&p_xnxq=2024-20252&p_dqxn=2024-2025&p_dqxq=1&p_dqxnxq=2024-20251&p_xkfsdm=ty-b-b&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id={}&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=16", id))
+        .body(format!("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=rwtjzyx&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=2024-2025&p_xq=2&p_xnxq=2024-20252&p_dqxn=2024-2025&p_dqxq=1&p_dqxnxq=2024-20251&p_xkfsdm=xx-b-b&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id={}&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=18", id))
         .send()
         .await?
         .text()

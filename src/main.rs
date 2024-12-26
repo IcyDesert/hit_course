@@ -3,7 +3,8 @@ use colored::*;
 use reqwest::Client;
 use serde_json::Value;
 use std::error::Error;
-use std::fs::File;
+use std::fs::{self, File};
+use std::path::Path;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -11,6 +12,10 @@ struct Args {
     /// cookie
     #[arg(short, long)]
     cookie: String,
+
+    /// show curl command
+    #[arg(short, long, default_value_t = false)]
+    show: bool,
 }
 
 async fn curl_request(cookie: &str, id: &str) -> Result<String, Box<dyn Error>> {
@@ -39,7 +44,7 @@ async fn curl_request(cookie: &str, id: &str) -> Result<String, Box<dyn Error>> 
 #[allow(unused)]
 fn curl_request_str(cookie: &str, id: ColoredString) -> String {
     format!(
-    r#"curl "http://jw.hitsz.edu.cn/Xsxk/addGouwuche" \
+        r#"curl "http://jw.hitsz.edu.cn/Xsxk/addGouwuche" \
     -H 'Accept: */*' \
     -H 'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6' \
     -H 'Cache-Control: no-cache' \
@@ -60,34 +65,41 @@ fn curl_request_str(cookie: &str, id: ColoredString) -> String {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+    let courses_dir = Path::new("./all_courses");
 
-    let file = File::open("./must.json").expect("unable to open file.");
-    let must_choose: Value = serde_json::from_reader(file)?;
-    let cookie = args.cookie;
+    if !courses_dir.is_dir() {
+        eprintln!("The directory {} does not exist.", courses_dir.display());
+    }
 
-    let _res = choose_course(
-        must_choose["kxrwList"]["list"]
-            .as_array()
-            .unwrap_or(&vec![]),
-        &cookie,
-    )
-    .await?;
+    for entry in fs::read_dir(courses_dir)? {
+        let entry = entry?;
+        let path = entry.path();
 
-    let file = File::open("./pe.json").expect("unable to open file.");
-    let must_choose: Value = serde_json::from_reader(file)?;
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+            let file = File::open(&path).expect("unable to open file.");
+            let must_choose: Value = serde_json::from_reader(file)?;
+            let cookie = &args.cookie;
+            let show_curl = args.show;
 
-    let _res = choose_course(
-        must_choose["kxrwList"]["list"]
-            .as_array()
-            .unwrap_or(&vec![]),
-        &cookie,
-    )
-    .await?;
+            let _res = choose_course(
+                must_choose["kxrwList"]["list"]
+                    .as_array()
+                    .unwrap_or(&vec![]),
+                cookie,
+                show_curl,
+            )
+            .await?;
+        }
+    }
 
     Ok(())
 }
 
-async fn choose_course(all_course: &Vec<Value>, cookie: &str) -> Result<(), Box<dyn Error>> {
+async fn choose_course(
+    all_course: &Vec<Value>,
+    cookie: &str,
+    show_curl: bool,
+) -> Result<(), Box<dyn Error>> {
     for course in all_course {
         println!(
             "\n\nCourse id: {}, Course name: {}, Course teacher: {} {}",
@@ -97,18 +109,25 @@ async fn choose_course(all_course: &Vec<Value>, cookie: &str) -> Result<(), Box<
             course["tyxmmc"].as_str().unwrap_or("").blue().bold(),
         );
 
-        println!("{}", "Choose this? Yes: Y/y/yes, else no.".green().bold());
+        println!(
+            "{}",
+            "Choose this? Yes: Y/y/YES/Yes/YeS/yeS/yEs/yeS/yes, else no."
+                .green()
+                .bold()
+        );
         let mut buffer = String::new();
         let stdin = std::io::stdin(); // We get `Stdin` here
         stdin.read_line(&mut buffer)?;
         let yes = buffer.trim().to_lowercase() == "y" || buffer.trim().to_lowercase() == "yes";
 
         if yes {
-            // println!(
-            //     "{}\n{}\n",
-            //     "request curl command:".green().bold(),
-            //     curl_request_str(cookie, course["id"].as_str().unwrap().green().bold())
-            // );
+            if show_curl {
+                println!(
+                    "{}\n{}\n",
+                    "request curl command:".green().bold(),
+                    curl_request_str(cookie, course["id"].as_str().unwrap().green().bold())
+                );
+            }
 
             let res = curl_request(cookie, course["id"].as_str().unwrap()).await?;
             println!("Response: {}", res);
