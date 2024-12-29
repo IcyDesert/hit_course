@@ -20,11 +20,11 @@ struct Args {
     #[arg(short, long)]
     password: String,
 
-    /// 是否从外部 JSON 读取课程信息
+    /// 是否从外部 JSON 读取课程信息，默认是（也只做了是
     #[arg(short, long, default_value_t = true)]
     json: bool,
 
-    /// 存放json 的文件夹地址
+    /// 存放json 的文件夹地址，默认 all_courses
     #[arg(short, long)]
     folder_addr: Option<String>,
 }
