@@ -38,13 +38,16 @@ all_courses/<your courses>.json
 ./hit_course --cookie <your cookie>
 ```
 
-就可以开始选择你要抢的课了，例如：
-
+就可以开始选择你要抢的课了，例如（windows）：
 ```bash
 .\hit_course.exe -c "route=<your route>; JSESSIONID=<your JSESSIONID>"
 ```
 
 需要注意的是，推荐在抢课前提前将上述导入课程 `.json` 的步骤做好，否则在抢课的时候你可能甚至没法登陆看到这些课程的内容。
+
+> 所以什么是 cookie？为什么程序拿到 cookie 可以帮你抢课？安全吗？你可以查询一下 cookie/session 相关知识了解。
+>
+> 可能会遇到的问题有：教务抽风导致的各种 session 失效。教务抽风导致的返回值 null, 教务抽风导致的 ......
 
 ### req_auth
 
@@ -57,10 +60,10 @@ all_courses/<your courses>.json
 ```
 
 就能看到帮助文档，简单易用。使用方法为：
-
 ```bash
 ./req_auth -u <your username> -p <your password>
 ```
+需要注意，req auth也需要你提前准备好 `json` 文件，方法和上述一样。只不过现在不需要你手动准备 cookie，而是给账号密码自动走一遍登陆流程。
 
 ## 自己构建
 
@@ -71,4 +74,9 @@ cargo build --release
 cargo build --example req_auth --release
 ```
 
-如果用不了，可以考虑去源码中更改对应的请求体，因为教务本身请求体非常丑陋（全都是不明所以的拼音缩写），我看不懂，所以基本上就是替换关键词。
+如果用不了，可以考虑去源码中更改对应的请求体，因为教务本身请求体非常丑陋（全都是不明所以的拼音缩写），我看不懂，所以基本上就是替换关键字。
+
+
+TODO：
+---
+需要注意的小问题：因为事实上就是没法看懂请求体的具体内容，所以我没法做通用的。如果我还在更新那没事，如果没有更新，可以考虑参考上面获取课程json的方法，看看curl请求体里面的body，更新一些，例如 2024-2025学年......
