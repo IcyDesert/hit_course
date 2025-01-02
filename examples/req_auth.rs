@@ -105,34 +105,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let _res = choose_course(
                     to_choose["kxrwList"]["list"].as_array().unwrap_or(&vec![]),
                     client.clone(),
-                    to_choose["xsxkPage"]["p_xkfsdm"]
-                        .as_str()
-                        .expect("no method specified."),
-                    // "xx-b-b",
-                    to_choose["xsxkPage"]["p_dqxnxq"]
-                        .as_str()
-                        .expect("no ...dqxnxq specified."),
-                    to_choose["xsxkPage"]["p_xn"]
-                        .as_str()
-                        .expect("no year specified."),
-                    to_choose["xsxkPage"]["p_xnxq"]
-                        .as_str()
-                        .expect("no year_semister specified."),
-                    to_choose["xsxkPage"]["p_xq"]
-                        .as_str()
-                        .expect("no semister specified."),
-                    to_choose["xsxkPage"]["p_dqxn"]
-                        .as_str()
-                        .expect("no semister specified."),
-                    to_choose["xsxkPage"]["p_dqxq"]
-                        .as_str()
-                        .expect("no semister specified."),
-                    to_choose["xsxkPage"]["p_sfgldjr"]
-                        .as_str()
-                        .expect("no semister specified."),
-                    to_choose["xsxkPage"]["p_pylx"]
-                        .as_str()
-                        .expect("no semister specified."),
+                    &to_choose,
                 )
                 .await?;
             }
@@ -140,83 +113,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         return Ok(());
     }
-
-    // get courses.
-    // let mut body = init_req_body();
-
-    // let response = client
-    //     .post("http://jw.hitsz.edu.cn/Xsxk/queryXkdqXnxq")
-    //     .header("Connection", "keep-alive")
-    //     .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-    //     .body("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=&p_xq=&p_xnxq=&p_dqxn=&p_dqxq=&p_dqxnxq=&p_xkfsdm=&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id=&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=")
-    //     .send()
-    //     .await?
-    //     .text()
-    //     .await?;
-
-    // let params = from_str::<Value>(&response)?;
-    // if let Value::Object(map) = params {
-    //     for (key, value) in map.iter() {
-    //         body.insert(key.to_string(), value.as_str().unwrap().to_string());
-    //     }
-    // }
-
-    // let response = client
-    //     .post("http://jw.hitsz.edu.cn/Xsxk/queryKxrw")
-    //     .header("Connection", "keep-alive")
-    //     .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
-    //     .body("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=2024-2025&p_xq=2&p_xnxq=2024-20252&p_dqxn=2024-2025&p_dqxq=1&p_dqxnxq=2024-20251&p_xkfsdm=bx-b-b&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id=&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=100")
-    //     .send()
-    //     .await?
-    //     .text()
-    //     .await?;
-
-    // let must_course = from_str::<Value>(&response)?;
-    // let binding = vec![];
-    // let must_course = must_course["kxrwList"]["list"]
-    //     .as_array()
-    //     .unwrap_or(&binding);
-
-    // let response = client
-    //     .post("http://jw.hitsz.edu.cn/Xsxk/queryKxrw")
-    //     .header("Connection", "keep-alive")
-    //     .header(
-    //         "Content-Type",
-    //         "application/x-www-form-urlencoded; charset=UTF-8",
-    //     )
-    //     // .form(&body)
-    //     .body("cxsfmt=0&p_pylx=1&mxpylx=1&p_sfgldjr=0&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=&p_chaxunxh=&p_gjz=&p_skjs=&p_xn=2024-2025&p_xq=2&p_xnxq=2024-20252&p_dqxn=2024-2025&p_dqxq=1&p_dqxnxq=2024-20251&p_xkfsdm=ty-b-b&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id=&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=100")
-    //     .send()
-    //     .await?
-    //     .text()
-    //     .await?;
-
-    // let pe_course = from_str::<Value>(&response)?;
-    // let pe_course = pe_course["kxrwList"]["list"].as_array().unwrap_or(&binding);
-
-    // println!("{}", "All courses:".green().bold());
-    // list_all_course(must_course);
-    // list_all_course(pe_course);
-
-    // println!("{}", "Choose courses:".green().bold());
-    // let _res = choose_course(must_course, client.clone()).await?;
-    // let _res = choose_course(pe_course, client).await?;
-
     Ok(())
 }
 
 async fn choose_course(
     all_course: &Vec<Value>,
     client: Client,
-    choose_method: &str,
-    dq_year_semister: &str,
-    year: &str,
-    year_semister: &str,
-    semister: &str,
-    dq_year: &str,
-    dq_semister: &str,
-    sfgldjr:&str,
-    pylx:&str
+    to_choose: &Value,
 ) -> Result<(), Box<dyn Error>> {
     for course in all_course {
         println!(
@@ -240,20 +143,7 @@ async fn choose_course(
             //     curl_request_str(cookie, course["id"].as_str().unwrap().green().bold())
             // );
 
-            let res = curl_request(
-                client.clone(),
-                course["id"].as_str().unwrap(),
-                choose_method,
-                dq_year_semister,
-                year,
-                year_semister,
-                semister,
-                dq_year,
-                dq_semister,
-                sfgldjr,
-                pylx
-            )
-            .await;
+            let res = curl_request(client.clone(), course["id"].as_str().unwrap(), to_choose).await;
             let _ = match res {
                 Ok(res) => println!("{} {}", "Success:".green().bold(), res),
                 Err(e) => println!("{}", e.to_string().red().bold()),
@@ -282,15 +172,7 @@ fn list_all_course(all_course: &Vec<Value>) {
 async fn curl_request(
     client: Client,
     id: &str,
-    choose_method: &str,
-    dq_year_semister: &str,
-    year: &str,
-    year_semister: &str,
-    semister: &str,
-    dq_year: &str,
-    dq_semister: &str,
-    sfgldjr: &str,
-    pylx:&str
+    to_choose: &Value,
 ) -> Result<String, Box<dyn Error>> {
     let response = client.post("http://jw.hitsz.edu.cn/Xsxk/addGouwuche")
         .header("Connection", "keep-alive")
@@ -299,15 +181,34 @@ async fn curl_request(
             "application/x-www-form-urlencoded; charset=UTF-8",
         )
         .body(format!("cxsfmt=0&p_pylx={}&mxpylx=1&p_sfgldjr={}&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=rwtjzyx&p_chaxunxh=&p_gjz=&p_skjs=&p_xn={}&p_xq={}&p_xnxq={}&p_dqxn={}&p_dqxq={}&p_dqxnxq={}&p_xkfsdm={}&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id={}&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=18",
-            pylx,
-            sfgldjr,
-            year,
-            semister,
-            year_semister,
-            dq_year,
-            dq_semister,
-            dq_year_semister,
-            choose_method, 
+            to_choose["xsxkPage"]["p_pylx"]
+                .as_str()
+                .expect("no semister specified."),
+            to_choose["xsxkPage"]["p_sfgldjr"]
+                .as_str()
+                .expect("no semister specified."),
+            to_choose["xsxkPage"]["p_xn"]
+                .as_str()
+                .expect("no year specified."),
+            to_choose["xsxkPage"]["p_xq"]
+                .as_str()
+                .expect("no semister specified."),
+            to_choose["xsxkPage"]["p_xnxq"]
+                .as_str()
+                .expect("no year_semister specified."),
+            to_choose["xsxkPage"]["p_dqxn"]
+                .as_str()
+                .expect("no semister specified."),
+            to_choose["xsxkPage"]["p_dqxq"]
+                .as_str()
+                .expect("no semister specified."),
+            to_choose["xsxkPage"]["p_dqxnxq"]
+                .as_str()
+                .expect("no ...dqxnxq specified."),
+            to_choose["xsxkPage"]["p_xkfsdm"]
+                .as_str()
+                .expect("no method specified."),
+            // "xx-b-b",
             id))
         .send()
         .await?
@@ -316,51 +217,3 @@ async fn curl_request(
 
     Ok(response)
 }
-
-// #[allow(unused)]
-// fn init_req_body() -> HashMap<String, String> {
-//     let mut body = HashMap::new();
-//     body.insert("cxsfmt".to_string(), "0".to_string());
-//     body.insert("p_pylx".to_string(), "1".to_string());
-//     body.insert("mxpylx".to_string(), "1".to_string());
-//     body.insert("p_sfgldjr".to_string(), "0".to_string());
-//     body.insert("p_sfredis".to_string(), "0".to_string());
-//     body.insert("p_sfsyxkgwc".to_string(), "0".to_string());
-//     body.insert("p_xktjz".to_string(), "".to_string());
-//     body.insert("p_chaxunxh".to_string(), "".to_string());
-//     body.insert("p_gjz".to_string(), "".to_string());
-//     body.insert("p_skjs".to_string(), "".to_string());
-//     body.insert("p_xn".to_string(), "2024-2025".to_string());
-//     body.insert("p_xq".to_string(), "2".to_string());
-//     body.insert("p_xnxq".to_string(), "2024-20252".to_string());
-//     body.insert("p_dqxn".to_string(), "2024-2025".to_string());
-//     body.insert("p_dqxq".to_string(), "1".to_string());
-//     body.insert("p_dqxnxq".to_string(), "2024-20251".to_string());
-//     body.insert("p_xkfsdm".to_string(), "bx-b-b".to_string());
-//     body.insert("p_xiaoqu".to_string(), "".to_string());
-//     body.insert("p_kkyx".to_string(), "".to_string());
-//     body.insert("p_kclb".to_string(), "".to_string());
-//     body.insert("p_xkxs".to_string(), "".to_string());
-//     body.insert("p_dyc".to_string(), "".to_string());
-//     body.insert("p_kkxnxq".to_string(), "".to_string());
-//     body.insert("p_id".to_string(), "".to_string());
-//     body.insert("sfhlctkc".to_string(), "0".to_string());
-//     body.insert("sfhllrlkc".to_string(), "0".to_string());
-//     body.insert("p_kxsj_xqj".to_string(), "".to_string());
-//     body.insert("p_kxsj_ksjc".to_string(), "".to_string());
-//     body.insert("p_kxsj_jsjc".to_string(), "".to_string());
-//     body.insert("p_kcdm_js".to_string(), "".to_string());
-//     body.insert("p_kcdm_cxrw".to_string(), "".to_string());
-//     body.insert("p_kc_gjz".to_string(), "".to_string());
-//     body.insert("p_xzcxtjz_nj".to_string(), "".to_string());
-//     body.insert("p_xzcxtjz_yx".to_string(), "".to_string());
-//     body.insert("p_xzcxtjz_zy".to_string(), "".to_string());
-//     body.insert("p_xzcxtjz_zyfx".to_string(), "".to_string());
-//     body.insert("sfxsgwckb".to_string(), "1".to_string());
-//     body.insert("skyy".to_string(), "".to_string());
-//     body.insert("chaxunxkfsdm".to_string(), "".to_string());
-//     body.insert("pageNum".to_string(), "1".to_string());
-//     body.insert("pageSize".to_string(), "17".to_string());
-
-//     body
-// }
