@@ -72,13 +72,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let _response = client
+    let response = client
         .post("https://sso.hitsz.edu.cn:7002/cas/oauth2.0/authorize")
         .form(&form_data)
         .send()
         .await?;
 
-    println!("{}", "Login success.".green().bold());
+    if response.status().is_success() {
+        println!("{}", "Login success.".green().bold());
+    } else {
+        println!("{}", "Login failed.".red().bold());
+        return Ok(());
+    }
     // auth end.
 
     if args.json {
