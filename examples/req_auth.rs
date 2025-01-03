@@ -8,6 +8,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::{self, File};
 use std::path::Path;
+use std::thread::sleep;
+use std::time::Duration;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -20,9 +22,10 @@ struct Args {
     #[arg(short, long)]
     password: String,
 
-    /// 是否从外部 JSON 读取课程信息，默认是（也只做了是
-    #[arg(short, long, default_value_t = true)]
-    json: bool,
+    /// 默认从文件夹中读取 JSON（的课程信息）。
+    /// 如果加上此参数'./req_auth -s' 则会从当前目录读 `pre_select.json`进行直接选课。
+    #[arg(short, long, default_value_t = false)]
+    selected_json: bool,
 
     /// 存放json 的文件夹地址，默认 all_courses
     #[arg(short, long)]
@@ -86,7 +89,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     // auth end.
 
-    if args.json {
+    let mut pre_select: Value = Value::Null;
+
+    if !args.selected_json {
         for entry in fs::read_dir(courses_dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -94,11 +99,33 @@ async fn main() -> Result<(), Box<dyn Error>> {
             if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
                 let file = File::open(&path).expect("unable to open file.");
                 let to_choose: Value = serde_json::from_reader(file)?;
+
+                pre_select = to_choose.clone();
+                pre_select["kxrwList"]["list"]
+                    .as_array_mut()
+                    .unwrap()
+                    .clear();
 
                 list_all_course(to_choose["kxrwList"]["list"].as_array().unwrap_or(&vec![]));
             }
         }
+    } else {
+        let file = File::open("./pre_select.json").expect("unable to open file.");
+        let to_choose: Value = serde_json::from_reader(file)?;
+        list_all_course(to_choose["kxrwList"]["list"].as_array().unwrap_or(&vec![]));
 
+        let _res = choose_course(
+            to_choose["kxrwList"]["list"].as_array().unwrap_or(&vec![]),
+            client.clone(),
+            &to_choose,
+            &mut pre_select,
+            true,
+        )
+        .await?;
+        return Ok(());
+    }
+
+    loop {
         for entry in fs::read_dir(courses_dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -106,25 +133,31 @@ async fn main() -> Result<(), Box<dyn Error>> {
             if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
                 let file = File::open(&path).expect("unable to open file.");
                 let to_choose: Value = serde_json::from_reader(file)?;
-
                 let _res = choose_course(
                     to_choose["kxrwList"]["list"].as_array().unwrap_or(&vec![]),
                     client.clone(),
                     &to_choose,
+                    &mut pre_select,
+                    false,
                 )
                 .await?;
             }
         }
 
-        return Ok(());
+        // save pre_select to pre_select.json
+        let pre_select_file = File::create("pre_select.json")?;
+        serde_json::to_writer(pre_select_file, &pre_select)?;
+        println!("{}", "pre_select.json saved.".purple().bold());
+        println!("{}", "A NEW TERM BEGINS.\n----\n----\n----".purple().bold());
     }
-    Ok(())
 }
 
 async fn choose_course(
     all_course: &Vec<Value>,
     client: Client,
-    to_choose: &Value,
+    to_choose: &Value, // for curl request param: xn/xq/...
+    pre_select: &mut Value,
+    use_pre_select: bool,
 ) -> Result<(), Box<dyn Error>> {
     for course in all_course {
         println!(
@@ -135,24 +168,68 @@ async fn choose_course(
             course["tyxmmc"].as_str().unwrap_or("").blue().bold(),
         );
 
-        println!("{}", "Choose this? Yes: Y/y/yes, else no.".green().bold());
-        let mut buffer = String::new();
-        let stdin = std::io::stdin(); // We get `Stdin` here
-        stdin.read_line(&mut buffer)?;
-        let yes = buffer.trim().to_lowercase() == "y" || buffer.trim().to_lowercase() == "yes";
+        let (yes, select) = if !use_pre_select {
+            println!(
+                "{} {}",
+                "Choose this? Yes: Y/y/yes, else no.".green().bold(),
+                "Input Select/S/s to add to pre_select.json".blue().bold(),
+            );
+            let mut buffer = String::new();
+            let stdin = std::io::stdin(); // We get `Stdin` here
+            stdin.read_line(&mut buffer)?;
+            let buffer = buffer.trim().to_lowercase();
+            let yes = buffer == "y" || buffer == "yes";
+            let select = buffer == "s" || buffer == "select";
+            (yes, select)
+        } else {
+            (true, false)
+        };
 
         if yes {
-            // println!(
-            //     "{}\n{}\n",
-            //     "request curl command:".green().bold(),
-            //     curl_request_str(cookie, course["id"].as_str().unwrap().green().bold())
-            // );
+            let max_retries = 3;
+            let mut attempt = 0;
 
-            let res = curl_request(client.clone(), course["id"].as_str().unwrap(), to_choose).await;
-            let _ = match res {
-                Ok(res) => println!("{} {}", "Success:".green().bold(), res),
-                Err(e) => println!("{}", e.to_string().red().bold()),
-            };
+            while attempt < max_retries {
+                let res =
+                    curl_request(client.clone(), course["id"].as_str().unwrap(), to_choose).await;
+                match res {
+                    Ok(res) => {
+                        println!("{} {}", "Success:".green().bold(), res);
+                        break;
+                    }
+                    Err(e) => {
+                        attempt += 1;
+                        if attempt < max_retries {
+                            println!(
+                                "{} {} (Attempt {}/{})",
+                                "Error:".red().bold(),
+                                e.to_string(),
+                                attempt,
+                                max_retries
+                            );
+                            sleep(Duration::from_secs(3));
+                        } else {
+                            println!(
+                                "{} {} (Max retries reached)",
+                                "Error:".red().bold(),
+                                e.to_string()
+                            );
+                        }
+                    }
+                }
+            }
+
+            if use_pre_select {
+                sleep(Duration::from_secs(2));
+            }
+        } else if select {
+            pre_select["kxrwList"]["list"]
+                .as_array_mut()
+                .unwrap()
+                .push(course.clone());
+
+            println!("{}", "selected.".blue().bold());
+            continue;
         } else {
             println!("{}", "Skip this course.".red().bold());
             continue;
