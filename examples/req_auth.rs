@@ -11,8 +11,58 @@ use std::path::Path;
 use std::thread::sleep;
 use std::time::Duration;
 
+// 新增依赖
+use base64::engine::general_purpose;
+use base64::Engine;
+use openssl::symm::{encrypt, Cipher};
+use rand::{rng, Rng};
+
+/// Cli styles
+pub fn get_styles() -> clap::builder::Styles {
+    clap::builder::Styles::styled()
+        .usage(
+            anstyle::Style::new()
+                .bold()
+                .underline()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow))),
+        )
+        .header(
+            anstyle::Style::new()
+                .bold()
+                .underline()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Yellow))),
+        )
+        .literal(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green))),
+        )
+        .invalid(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red))),
+        )
+        .error(
+            anstyle::Style::new()
+                .bold()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Red))),
+        )
+        .valid(
+            anstyle::Style::new()
+                .bold()
+                .underline()
+                .fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::Green))),
+        )
+        .placeholder(
+            anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::White))),
+        )
+}
+
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(styles=get_styles())]
+#[command(version = "0.6.0")]
+#[command(author = "YinMo19")]
+#[command(about, long_about = None)]
 struct Args {
     /// 用户名
     #[arg(short, long)]
@@ -32,9 +82,40 @@ struct Args {
     folder_addr: Option<String>,
 }
 
+fn random_string(n: usize) -> String {
+    const AES_CHARS: &[u8] = b"ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678";
+    let mut rng = rng();
+    (0..n)
+        .map(|_| {
+            let idx = rng.random_range(0..AES_CHARS.len());
+            AES_CHARS[idx] as char
+        })
+        .collect()
+}
+
+/// encrypt
+fn aes_encrypt_password(password: &str, salt: &str) -> Result<String, Box<dyn Error>> {
+    if salt.is_empty() {
+        return Ok(password.to_string());
+    }
+
+    let iv = random_string(16);
+    let prefix = random_string(64);
+    let mut data = prefix.into_bytes();
+    data.extend_from_slice(password.as_bytes());
+
+    // the Cipher's padding is default PKCS7.
+    let cipher = Cipher::aes_128_cbc();
+    let key = salt.as_bytes();
+
+    assert!(key.len() == 16, "Salt length NOT equals 16.");
+    let ciphertext = encrypt(cipher, key, Some(iv.as_bytes()), &data)?;
+
+    Ok(general_purpose::STANDARD.encode(ciphertext))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // parse params
     let args = Args::parse();
 
     let path = args.folder_addr.unwrap_or("./all_courses".to_string());
@@ -54,43 +135,68 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // authenticate
     println!("{}", "Authenticating...".blue().bold());
     let response = client
-        .get("https://ids.hit.edu.cn/authserver/combinedLogin.do?type=IDSUnion&appId=ff2dfca3a2a2448e9026a8c6e38fa52b&success=http%3A%2F%2Fjw.hitsz.edu.cn%2FcasLogin")
+        .get("https://ids.hit.edu.cn/authserver/login?service=http%3A%2F%2Fjw.hitsz.edu.cn%2FcasLogin")
         .send()
         .await?
         .text()
         .await?;
 
     let document = Html::parse_document(&response);
-    let input_selector = Selector::parse("form#authZForm input[type=hidden]").unwrap();
+    // println!("{}", document.root_element().html());
+
+    let input_selector = Selector::parse("form#pwdFromId input[type=hidden]").unwrap();
 
     let mut form_data = HashMap::new();
-    form_data.insert("username", args.username);
-    form_data.insert("password", args.password);
+    form_data.insert("username".to_string(), args.username.clone());
+    form_data.insert("password".to_string(), args.password.clone());
+
+    let mut pwd_salt_opt: Option<String> = None;
 
     for input in document.select(&input_selector) {
         if let Some(name) = input.value().attr("name") {
             if let Some(value) = input.value().attr("value") {
-                form_data.insert(name, value.to_string());
+                form_data.insert(name.to_string(), value.to_string());
+                if name == "pwdEncryptSalt" {
+                    pwd_salt_opt = Some(value.to_string());
+                }
+            }
+        } else if let Some(id) = input.value().attr("id") {
+            if id == "pwdEncryptSalt" {
+                if let Some(value) = input.value().attr("value") {
+                    // form_data.insert("pwdEncryptSalt".to_string(), value.to_string());
+                    pwd_salt_opt = Some(value.to_string());
+                }
             }
         }
     }
 
+    // 使用服务端返回的 salt 对密码进行加密
+    if let Some(salt) = pwd_salt_opt {
+        let encrypted_password = aes_encrypt_password(&args.password, &salt)?;
+        form_data.insert("password".to_string(), encrypted_password);
+    } else {
+        panic!("{}", "fail to get pwdEncryptSalt.".red().bold());
+    }
+
+    // captcha is none.
+    form_data.insert("captcha".to_string(), "".to_string());
+    form_data.insert("rememberMe".to_string(), "true".to_string());
+
     let response = client
-        .post("https://sso.hitsz.edu.cn:7002/cas/oauth2.0/authorize")
+        .post("https://ids.hit.edu.cn/authserver/login?service=http%3A%2F%2Fjw.hitsz.edu.cn%2FcasLogin")
         .form(&form_data)
         .send()
         .await?;
 
-    if response.status().is_success() {
-        println!("{}", "Login success.".green().bold());
-    } else {
-        println!("{}", "Login failed.".red().bold());
-        return Ok(());
+    if !response.url().as_str().contains("/authentication/main") {
+        panic!(
+            "{}{}",
+            "Authentication failed, return url is ".red().bold(),
+            response.url().as_str().blue()
+        );
     }
-    // auth end.
 
     let mut pre_select: Value = Value::Null;
-
     if !args.selected_json {
         for entry in fs::read_dir(courses_dir)? {
             let entry = entry?;
@@ -175,7 +281,7 @@ async fn choose_course(
                 "Input Select/S/s to add to pre_select.json".blue().bold(),
             );
             let mut buffer = String::new();
-            let stdin = std::io::stdin(); // We get `Stdin` here
+            let stdin = std::io::stdin();
             stdin.read_line(&mut buffer)?;
             let buffer = buffer.trim().to_lowercase();
             let yes = buffer == "y" || buffer == "yes";
@@ -228,7 +334,7 @@ async fn choose_course(
                 .unwrap()
                 .push(course.clone());
 
-            println!("{}", "selected.".blue().bold());
+            println!("{}", "selected".blue().bold());
             continue;
         } else {
             println!("{}", "Skip this course.".red().bold());
@@ -264,8 +370,8 @@ async fn curl_request(
         )
         .body(format!("cxsfmt=0&p_pylx={}&mxpylx=1&p_sfgldjr={}&p_sfredis=0&p_sfsyxkgwc=0&p_xktjz=rwtjzyx&p_chaxunxh=&p_gjz=&p_skjs=&p_xn={}&p_xq={}&p_xnxq={}&p_dqxn={}&p_dqxq={}&p_dqxnxq={}&p_xkfsdm={}&p_xiaoqu=&p_kkyx=&p_kclb=&p_xkxs=&p_dyc=&p_kkxnxq=&p_id={}&p_sfhlctkc=0&p_sfhllrlkc=0&p_kxsj_xqj=&p_kxsj_ksjc=&p_kxsj_jsjc=&p_kcdm_js=&p_kcdm_cxrw=&p_kc_gjz=&p_xzcxtjz_nj=&p_xzcxtjz_yx=&p_xzcxtjz_zy=&p_xzcxtjz_zyfx=&p_xzcxtjz_bj=&p_sfxsgwckb=1&p_skyy=&p_chaxunxkfsdm=&pageNum=1&pageSize=18",
             to_choose["xsxkPage"]["p_pylx"]
-                .as_str()
-                .expect("no semister specified."),
+            .as_str()
+            .expect("no semister specified."),
             to_choose["xsxkPage"]["p_sfgldjr"]
                 .as_str()
                 .expect("no semister specified."),
