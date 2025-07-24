@@ -135,7 +135,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     // authenticate
     println!("{}", "Authenticating...".blue().bold());
     let response = client
-        .get("https://ids.hit.edu.cn/authserver/login?service=http%3A%2F%2Fjw.hitsz.edu.cn%2FcasLogin")
+        .get("https://ids.hit.edu.cn/authserver/login?service=http%3A%2F%2Fjw-hitsz-edu-cn.hitsz.edu.cn%2FcasLogin")
         .send()
         .await?
         .text()
@@ -183,7 +183,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     form_data.insert("rememberMe".to_string(), "true".to_string());
 
     let response = client
-        .post("https://ids.hit.edu.cn/authserver/login?service=http%3A%2F%2Fjw.hitsz.edu.cn%2FcasLogin")
+        .post("https://ids.hit.edu.cn/authserver/login?service=http%3A%2F%2Fjw-hitsz-edu-cn.hitsz.edu.cn%2FcasLogin")
         .form(&form_data)
         .send()
         .await?;
@@ -362,7 +362,7 @@ async fn curl_request(
     id: &str,
     to_choose: &Value,
 ) -> Result<String, Box<dyn Error>> {
-    let response = client.post("http://jw.hitsz.edu.cn/Xsxk/addGouwuche")
+    let response = client.post("https://jw-hitsz-edu-cn.hitsz.edu.cn/Xsxk/addGouwuche")
         .header("Connection", "keep-alive")
         .header(
             "Content-Type",
